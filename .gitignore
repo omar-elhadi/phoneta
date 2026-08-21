@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Downloaded model weights (never committed)
+/models/
+*.ct2
+*.onnx
+*.pt
+*.safetensors
+
+# Recorded audio (privacy: never committed)
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local planning docs (kept out of repo history per owner's request)
+task.md
+speech-pronunciation-evaluator-spec.md
+speech-pronunciation-evaluator-plan.md
+speech-pronunciation-evaluator-tasks.md
