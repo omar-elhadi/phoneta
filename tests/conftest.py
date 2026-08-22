@@ -71,5 +71,39 @@ def _install_fakes() -> None:
     if "librosa" not in sys.modules:
         sys.modules["librosa"] = _module("librosa", pyin=MagicMock(), times_like=MagicMock())
 
+    if "PySide6" not in sys.modules:
+        _conv = _module(
+            "PySide6.QtCore",
+            Signal=type("Signal", (), {}),
+            QThread=type("QThread", (), {}),
+            Qt=MagicMock(),
+        )
+        _wid = _module(
+            "PySide6.QtWidgets",
+            QApplication=MagicMock(),
+            QComboBox=MagicMock(),
+            QDialog=MagicMock(),
+            QFrame=MagicMock(),
+            QGroupBox=MagicMock(),
+            QHBoxLayout=MagicMock(),
+            QHeaderView=MagicMock(),
+            QLabel=MagicMock(),
+            QLineEdit=MagicMock(),
+            QMainWindow=MagicMock(),
+            QMessageBox=MagicMock(),
+            QProgressBar=MagicMock(),
+            QPushButton=MagicMock(),
+            QScrollArea=MagicMock(),
+            QSizePolicy=MagicMock(),
+            QTableWidget=MagicMock(),
+            QTableWidgetItem=MagicMock(),
+            QVBoxLayout=MagicMock(),
+            QWidget=MagicMock(),
+        )
+        _pyside = _module("PySide6", QtCore=_conv, QtWidgets=_wid)
+        sys.modules["PySide6"] = _pyside
+        sys.modules["PySide6.QtCore"] = _conv
+        sys.modules["PySide6.QtWidgets"] = _wid
+
 
 _install_fakes()
