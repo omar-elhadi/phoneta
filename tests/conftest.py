@@ -1,8 +1,9 @@
 """Pytest fixtures.
 
-Injects lightweight fake ``sounddevice`` / ``torch`` modules into
-``sys.modules`` so unit tests can run without the heavy runtime dependencies
-installed.  Real packages, when present, are left untouched.
+Injects lightweight fake ``sounddevice`` / ``torch`` / ``phonemizer`` /
+``faster_whisper`` / ``montreal_forced_aligner`` modules into ``sys.modules``
+so unit tests can run without the heavy runtime dependencies installed.  Real
+packages, when present, are left untouched.
 """
 
 from __future__ import annotations
@@ -52,6 +53,20 @@ def _install_fakes() -> None:
             default=MagicMock(),
         )
         sys.modules["sounddevice"] = fake_sd
+
+    if "phonemizer" not in sys.modules:
+        fake_ph = _module("phonemizer")
+        fake_backend = _module("phonemizer.backend", EspeakBackend=MagicMock())
+        fake_ph.backend = fake_backend
+        sys.modules["phonemizer"] = fake_ph
+        sys.modules["phonemizer.backend"] = fake_backend
+
+    if "faster_whisper" not in sys.modules:
+        fake_fw = _module("faster_whisper", WhisperModel=MagicMock())
+        sys.modules["faster_whisper"] = fake_fw
+
+    if "montreal_forced_aligner" not in sys.modules:
+        sys.modules["montreal_forced_aligner"] = _module("montreal_forced_aligner")
 
 
 _install_fakes()
