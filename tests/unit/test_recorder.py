@@ -78,8 +78,11 @@ class TestAudioRecorder:
             def capture_side_effect(frames, **kwargs):
                 cb = kwargs.get("callback")
                 if cb:
-                    stereo = np.column_stack([fake_samples[:frames], fake_samples[:frames] * 0])
-                    cb(stereo, frames, None, None)
+                    # Deliver in small blocks like real sounddevice does
+                    for start in range(0, frames, 1024):
+                        block = fake_samples[start : start + 1024]
+                        stereo = np.column_stack([block, block * 0])
+                        cb(stereo, len(block), None, None)
 
             mock_rec.side_effect = capture_side_effect
 

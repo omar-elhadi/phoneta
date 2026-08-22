@@ -114,9 +114,10 @@ class VoiceActivityDetector:
         if sample_rate != SILERO_SR:
             audio = _resample(audio, sample_rate, SILERO_SR)
 
+        model = self._model()  # also populates self._get_speech_timestamps
         timestamps = self._get_speech_timestamps(
             audio,
-            self._model(),
+            model,
             threshold=self.threshold,
             sampling_rate=SILERO_SR,
         )

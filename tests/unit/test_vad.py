@@ -20,9 +20,14 @@ def _silence(duration_s: float, sr: int = 16000) -> np.ndarray:
 
 
 def _mock_silero(prob_values: np.ndarray) -> MagicMock:
-    """Return a mock silero-vad model that produces the given per-frame probs."""
+    """Return a mock silero-vad model that produces the given per-frame probs.
+
+    Real silero returns a torch Tensor; we mimic its ``.numpy()`` interface.
+    """
     mock_model = MagicMock()
-    mock_model.return_value = prob_values
+    output = MagicMock()
+    output.numpy.return_value = prob_values
+    mock_model.return_value = output
 
     def _mock_timestamps(audio, model, threshold, sampling_rate):
         result: list[dict] = []
@@ -89,14 +94,21 @@ class TestTrimSilence:
     def test_trim(self) -> None:
         # 0.5 s silence + 0.5 s tone + 0.5 s silence
         audio = np.concatenate([_silence(0.5), _sine(0.5), _silence(0.5)])
-        probs = np.array([0.0] * 4 + [0.9] * 8 + [0.0] * 4, dtype=np.float32)
+        # silero's mock timestamps map frame i -> sample i*512; derive probs
+        # from the actual audio so frame boundaries match the tone location.
+        frames = len(audio) // 512
+        probs = np.array(
+            [0.9 if np.max(np.abs(audio[i * 512 : (i + 1) * 512])) > 0.01 else 0.0 for i in range(frames)],
+            dtype=np.float32,
+        )
 
         mock_model, mock_utils = _mock_silero(probs)
         with patch("torch.hub.load", return_value=(mock_model, mock_utils)):
             trimmed = trim_silence(audio)
             assert len(trimmed) < len(audio)  # shorter
-            # first samples shouldn't be silence
-            assert np.max(np.abs(trimmed[:200])) > 0.0
+            # trimming removes silence only — every non-silent sample survives
+            assert np.count_nonzero(np.abs(trimmed) > 0.01) == np.count_nonzero(np.abs(audio) > 0.01)
+            assert np.max(np.abs(trimmed)) > 0.0
 
     def test_all_silence_returns_original(self) -> None:
         audio = _silence(0.5)
