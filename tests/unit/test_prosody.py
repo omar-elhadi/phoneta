@@ -8,7 +8,6 @@ import numpy as np
 import pytest
 
 from phoneta.core.metrics.prosody import (
-    ProsodyResult,
     analyze_f0,
     boundary_trend,
     extract_f0,

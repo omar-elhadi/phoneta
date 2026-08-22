@@ -15,8 +15,8 @@ Two entry points:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 MATCH = "match"
 SUBSTITUTION = "substitution"
@@ -39,8 +39,8 @@ class AlignedPair:
     and deletions (ref-only); both are set for matches/substitutions.
     """
 
-    ref: Optional[str]
-    user: Optional[str]
+    ref: str | None
+    user: str | None
     kind: str
 
     @property

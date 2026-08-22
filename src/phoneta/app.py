@@ -33,4 +33,5 @@ def run() -> int:
 
     window = MainWindow()
     window.show()
-    return app.exec()
+    result: int = app.exec()
+    return result

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any
 
 # espeak language codes used by phonemizer's backend.
 _ESPEAK_LANGS = {
@@ -44,11 +44,12 @@ class TextToIPA:
 
     def __init__(self, backend: str = "espeak") -> None:
         self.backend = backend
+        self._backends: dict[str, Any] = {}
 
-    def _backend_for(self, lang: str):
+    def _backend_for(self, lang: str) -> Any:
         """Lazily build (and cache) a phonemizer backend for *lang*."""
         cache_key = f"{self.backend}:{lang}"
-        cached = getattr(self, "_backends", None)
+        cached: dict[str, Any] | None = getattr(self, "_backends", None)
         if cached is None:
             cached = self._backends = {}
         if cache_key not in cached:

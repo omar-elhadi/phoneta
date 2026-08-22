@@ -14,7 +14,6 @@ from phoneta.core.alignment.sequence import (
 from phoneta.core.metrics.scoring import (
     CONFIDENCE_THRESHOLD,
     GREEN,
-    GREEN_THRESHOLD,
     RED,
     RED_THRESHOLD,
     YELLOW,

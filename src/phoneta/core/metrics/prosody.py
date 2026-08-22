@@ -14,7 +14,6 @@ unit-testable without it.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
@@ -87,7 +86,7 @@ def monotonicity(f0: np.ndarray) -> float:
     return float(np.mean(rel_change < _MONOTONE_REL_CHANGE))
 
 
-def analyze_f0(f0: np.ndarray, times: Optional[np.ndarray] = None) -> ProsodyResult:
+def analyze_f0(f0: np.ndarray, times: np.ndarray | None = None) -> ProsodyResult:
     """Summarise an F0 curve (with NaN for unvoiced frames) into a result.
 
     Pure function — no librosa needed.  ``times`` defaults to frame indices.

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import io
 import wave
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 import numpy as np
 
@@ -69,7 +69,7 @@ class AudioRecorder:
         self,
         duration_s: float = 10.0,
         level_interval_s: float = 0.05,
-        on_level: Optional[Callable[[float], None]] = None,
+        on_level: Callable[[float], None] | None = None,
     ) -> None:
         self.duration_s = float(duration_s)
         self.level_interval_s = max(float(level_interval_s), 0.01)
@@ -93,7 +93,10 @@ class AudioRecorder:
                 peak_rms = current_rms
 
             samples_since_last_callback += len(mono)
-            if self.on_level is not None and samples_since_last_callback >= callback_interval_samples:
+            if (
+                self.on_level is not None
+                and samples_since_last_callback >= callback_interval_samples
+            ):
                 samples_since_last_callback = 0
                 self.on_level(current_rms)
 

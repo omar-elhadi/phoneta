@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -44,7 +44,7 @@ class TestAudioRecorder:
             patch("sounddevice.query_devices", return_value={"default_samplerate": 16000}),
             patch("sounddevice.default") as mock_default,
             patch("sounddevice.rec") as mock_rec,
-            patch("sounddevice.wait") as mock_wait,
+            patch("sounddevice.wait"),
         ):
             mock_default.samplerate = 16000
 
@@ -86,7 +86,10 @@ class TestAudioRecorder:
 
             mock_rec.side_effect = capture_side_effect
 
-            AudioRecorder(duration_s=6.0, level_interval_s=0.1, on_level=callback_values.append).record()
+            AudioRecorder(
+                duration_s=6.0, level_interval_s=0.1,
+                on_level=callback_values.append,
+            ).record()
 
             # 6 s / 0.1 = ~60 callbacks (allow tolerance)
             assert 30 < len(callback_values) < 120

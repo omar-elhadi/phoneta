@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -26,7 +25,7 @@ class Transcription:
     """Result of transcribing one audio file."""
 
     text: str
-    language: Optional[str]
+    language: str | None
     words: tuple[WordTimestamp, ...]
 
 
@@ -38,7 +37,7 @@ class Transcriber:
         model_size: str = "base",
         device: str = "cpu",
         compute_type: str = "int8",
-        model_dir: Optional[str | Path] = None,
+        model_dir: str | Path | None = None,
     ) -> None:
         self.model_size = model_size
         self.device = device

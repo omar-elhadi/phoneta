@@ -6,9 +6,6 @@ thread so the UI stays responsive.
 
 from __future__ import annotations
 
-from typing import Optional
-
-import numpy as np
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -63,7 +60,7 @@ class RecorderView(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._worker: Optional[_RecordWorker] = None
+        self._worker: _RecordWorker | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -135,6 +132,7 @@ class RecorderView(QWidget):
         if isinstance(result, Exception):
             self.lbl_status.setText(f"Recording error: {result}")
             return
+        assert isinstance(result, RecordResult)
         self.lbl_status.setText(
             f"Recorded {result.duration_s:.1f} s — analysing …"
         )

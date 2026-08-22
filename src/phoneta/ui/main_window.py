@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from phoneta.core.metrics.prosody import ProsodyResult
+from phoneta.core.metrics.scoring import WordScore
 from phoneta.core.pipeline import PipelineResult, run_pipeline
 from phoneta.ui.inspector import InspectorDialog
 from phoneta.ui.privacy_badge import PrivacyBadge
@@ -30,7 +32,8 @@ LANGS = {"English": "en", "French (français)": "fr"}
 class _PipelineWorker(QThread):
     """Run the pipeline off the main (GUI) thread."""
 
-    done = Signal(object)  # PipelineResult | Exception
+    done = Signal(object)
+
 
     def __init__(
         self,
@@ -64,8 +67,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Phoneta — Offline Pronunciation Coach")
         self.resize(720, 560)
 
-        self._last_prosody = None
-        self._last_words = ()
+        self._last_prosody: ProsodyResult | None = None
+        self._last_words: tuple[WordScore, ...] = ()
         self._pipeline_worker: _PipelineWorker | None = None
         self._build()
 
@@ -157,6 +160,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Analysis failed.")
             return
 
+        assert isinstance(result, PipelineResult)
         self._last_words = result.words
         self._last_prosody = result.prosody
         self.results.set_results(result.words)

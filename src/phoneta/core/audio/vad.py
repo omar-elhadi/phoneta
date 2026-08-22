@@ -6,10 +6,9 @@ All inference is CPU-only; no network calls are made.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any
 
 import numpy as np
-
 
 SILERO_SR = 16000  # silero-vad operates at 16 kHz
 _WINDOW_MS = 30  # silero expects 30 ms windows
@@ -53,7 +52,7 @@ class VoiceActivityDetector:
     # internal helpers
     # ------------------------------------------------------------------
 
-    def _model(self):
+    def _model(self) -> Any:
         """Lazy-load the silero-vad model."""
         if not hasattr(self, "_vad_model"):
             import torch
@@ -98,8 +97,7 @@ class VoiceActivityDetector:
         model = self._model()
         tensor = torch.from_numpy(audio).float()
         with torch.no_grad():
-            prob = model(tensor, SILERO_SR).numpy()
-        return prob
+            return model(tensor, SILERO_SR).numpy()  # type: ignore[no-any-return]
 
     def find_speech(self, audio: np.ndarray, sample_rate: int = 16000) -> list[SpeechSegment]:
         """Return contiguous speech segments above the threshold.
@@ -172,4 +170,4 @@ def _resample(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
     duration = len(audio) / orig_sr
     new_len = int(duration * target_sr)
     indices = np.linspace(0, len(audio) - 1, new_len)
-    return np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
+    return np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)  # type: ignore[no-any-return]

@@ -20,9 +20,8 @@ from __future__ import annotations
 
 import tempfile
 import wave
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -97,7 +96,7 @@ def _score_words(
 ) -> list[WordScore]:
     """Align reference IPA to user segments and score each word."""
     scores: list[WordScore] = []
-    for wip, segs in zip(word_ipas, segment_groups):
+    for wip, segs in zip(word_ipas, segment_groups, strict=True):
         if not wip.analyzed or not wip.phonemes:
             # OOV — mark green (neutral) with no feedback
             scores.append(
@@ -146,8 +145,8 @@ def _score_words(
 def run_pipeline(
     target_text: str,
     lang: str,
-    audio_path: Optional[str | Path] = None,
-    audio_samples: Optional[np.ndarray] = None,
+    audio_path: str | Path | None = None,
+    audio_samples: np.ndarray | None = None,
     sample_rate: int = 16000,
     delete_audio: bool = True,
     vad_threshold: float = 0.5,
@@ -185,16 +184,10 @@ def run_pipeline(
         # ---- audio ingestion -------------------------------------------------
         if audio_samples is not None:
             wav_path = Path(temp_dir) / "recording.wav"
-            duration_s = _write_wav(audio_samples, sample_rate, str(wav_path))
+            _write_wav(audio_samples, sample_rate, str(wav_path))
             own_path = True
         elif audio_path is not None:
             wav_path = Path(audio_path)
-            # Determine duration from WAV header when possible.
-            try:
-                with wave.open(str(wav_path), "rb") as wf:
-                    duration_s = wf.getnframes() / wf.getframerate()
-            except (wave.Error, EOFError, FileNotFoundError):
-                duration_s = 1.0
         else:
             raise ValueError("One of audio_path or audio_samples is required")
 

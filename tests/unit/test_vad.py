@@ -98,7 +98,12 @@ class TestTrimSilence:
         # from the actual audio so frame boundaries match the tone location.
         frames = len(audio) // 512
         probs = np.array(
-            [0.9 if np.max(np.abs(audio[i * 512 : (i + 1) * 512])) > 0.01 else 0.0 for i in range(frames)],
+            [
+                0.9
+                if np.max(np.abs(audio[i * 512 : (i + 1) * 512])) > 0.01
+                else 0.0
+                for i in range(frames)
+            ],
             dtype=np.float32,
         )
 
@@ -107,7 +112,9 @@ class TestTrimSilence:
             trimmed = trim_silence(audio)
             assert len(trimmed) < len(audio)  # shorter
             # trimming removes silence only — every non-silent sample survives
-            assert np.count_nonzero(np.abs(trimmed) > 0.01) == np.count_nonzero(np.abs(audio) > 0.01)
+            assert np.count_nonzero(np.abs(trimmed) > 0.01) == np.count_nonzero(
+                np.abs(audio) > 0.01
+            )
             assert np.max(np.abs(trimmed)) > 0.0
 
     def test_all_silence_returns_original(self) -> None:

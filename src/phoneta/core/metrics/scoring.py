@@ -14,8 +14,8 @@ or its alignment confidence is below ``CONFIDENCE_THRESHOLD``.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 from phoneta.core.alignment.sequence import ERROR_KINDS, MATCH, AlignedPair
 
@@ -32,14 +32,14 @@ CONFIDENCE_THRESHOLD = 0.65  # flag phonemes with lower alignment confidence
 class PhonemeFeedback:
     """Per-phoneme evaluation for one alignment column."""
 
-    ref: Optional[str]  # target phoneme (None for insertions)
-    user: Optional[str]  # spoken phoneme (None for deletions)
+    ref: str | None  # target phoneme (None for insertions)
+    user: str | None  # spoken phoneme (None for deletions)
     kind: str  # match | substitution | insertion | deletion
     confidence: float
     flagged: bool
 
     @classmethod
-    def from_pair(cls, pair: AlignedPair, confidence: float) -> "PhonemeFeedback":
+    def from_pair(cls, pair: AlignedPair, confidence: float) -> PhonemeFeedback:
         flagged = pair.kind in ERROR_KINDS or confidence < CONFIDENCE_THRESHOLD
         return cls(
             ref=pair.ref,
@@ -67,7 +67,7 @@ class WordScore:
 def score_word(
     word: str,
     pairs: Sequence[AlignedPair],
-    confidences: Optional[Sequence[float]] = None,
+    confidences: Sequence[float] | None = None,
     prosody_issue: bool = False,
 ) -> WordScore:
     """Score one word from its alignment columns.
@@ -93,7 +93,8 @@ def score_word(
         raise ValueError("confidences must be parallel to pairs")
 
     feedback = tuple(
-        PhonemeFeedback.from_pair(pair, conf) for pair, conf in zip(pairs, confs)
+        PhonemeFeedback.from_pair(pair, conf)
+        for pair, conf in zip(pairs, confs, strict=True)
     )
     matches = sum(1 for p in pairs if p.kind == MATCH)
     accuracy = matches / len(pairs) if pairs else 1.0

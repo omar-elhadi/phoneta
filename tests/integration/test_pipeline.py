@@ -9,14 +9,13 @@ from __future__ import annotations
 import os
 import wave
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 from phoneta.core.alignment.g2p import WordIPA
 from phoneta.core.alignment.mfa import AlignmentResult, PhonemeSegment
-from phoneta.core.alignment.sequence import MATCH
 from phoneta.core.metrics.prosody import ProsodyResult
 from phoneta.core.pipeline import PipelineResult, run_pipeline
 
