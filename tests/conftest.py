@@ -68,5 +68,8 @@ def _install_fakes() -> None:
     if "montreal_forced_aligner" not in sys.modules:
         sys.modules["montreal_forced_aligner"] = _module("montreal_forced_aligner")
 
+    if "librosa" not in sys.modules:
+        sys.modules["librosa"] = _module("librosa", pyin=MagicMock(), times_like=MagicMock())
+
 
 _install_fakes()
