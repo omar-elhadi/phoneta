@@ -19,20 +19,50 @@ SQLite history, model downloader, and offline-audit gate. See the [spec](./speec
 - `espeak-ng` system package (used by `phonemizer` for text→IPA)
 - GPU optional — `faster-whisper` runs on CPU
 
-## Quick Start
+## Install
+
+**GPU (NVIDIA CUDA) — ~4 GB, recommended for real-time use:**
 
 ```bash
-# 1. Create venv and install
+bash scripts/install.sh             # auto-detects GPU and picks the right torch
+```
+
+**CPU-only — ~1.5 GB, slower ASR/VAD:**
+
+```bash
+bash scripts/install.sh --cpu       # skips CUDA, uses CPU torch (~200 MB instead of ~2.5 GB)
+```
+
+**Manual — pick your extras:**
+
+```bash
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"            # core + test/lint tools
+source .venv/bin/activate
 
-# 2. Download models (one-time, ~200 MB)
-python scripts/download_models.py
+# Fastest CI/dev (no torch — tests are mocked):
+pip install -e ".[dev]"                            # ~800 MB
 
-# 3. Launch the desktop app
-phoneta
-# or: python -m phoneta
+# Full GPU desktop:
+pip install -e ".[full,align]"                     # ~4 GB
+
+# Full CPU desktop:
+pip install -e ".[cpu,full,align]" --index-url https://download.pytorch.org/whl/cpu   # ~1.5 GB
+```
+
+| Extra | Includes | Size |
+|---|---|---|
+| `[dev]` | pytest, mypy, ruff (no torch) | ~800 MB |
+| `[vad]` | torch + torchaudio + silero-vad (voice detection) | +2.5 GB |
+| `[cpu]` | same as `[vad]` but CPU-only torch | +200 MB |
+| `[gpu]` | same as `[vad]` but CUDA torch | +2.5 GB |
+| `[align]` | Montreal Forced Aligner | +500 MB |
+| `[full]` | `[dev]` + `[vad]` | ~3.3 GB |
+| `[all]` | `[full]` + `[align]` | ~4 GB |
+
+## Model Download (one-time)
+
+```bash
+python scripts/download_models.py    # ~250 MB: Whisper base, silero, MFA
 ```
 
 ## Run Commands
