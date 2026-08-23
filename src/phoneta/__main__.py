@@ -19,10 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the Phoneta CLI. The GUI is wired up in a later phase."""
+    """Run the Phoneta desktop app."""
     build_parser().parse_args(argv)
-    print("Phoneta: UI not yet implemented. See README for roadmap.")
-    return 0
+    from phoneta.app import run
+    return run()
 
 
 if __name__ == "__main__":
