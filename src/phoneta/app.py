@@ -31,6 +31,17 @@ def run() -> int:
         """
     )
 
+    # ── first-run model setup ──────────────────────────────────
+    from phoneta.models.registry import all_present
+    from phoneta.ui.setup_screen import SetupScreen
+
+    if not all_present():
+        setup = SetupScreen()
+        if setup.exec() != SetupScreen.DialogCode.Accepted:
+            # User skipped — open main window anyway (limited functionality)
+            pass
+
+    # ── main window ────────────────────────────────────────────
     window = MainWindow()
     window.show()
     result: int = app.exec()
