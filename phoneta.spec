@@ -109,13 +109,3 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=True,
-    upx=True,
-    upx_exclude=[],
-    name="Phoneta",
-)

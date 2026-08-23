@@ -131,13 +131,3 @@ exe = EXE(
     entitlements_file=None,
     icon=None,
 )
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name="Phoneta",
-)

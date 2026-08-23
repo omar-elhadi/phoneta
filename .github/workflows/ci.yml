@@ -49,7 +49,7 @@ jobs:
         run: pyinstaller phoneta.spec --noconfirm
       - name: Smoke test
         run: |
-          dist/Phoneta/Phoneta --version
+          dist/Phoneta --version
 
   build-windows:
     runs-on: windows-latest
@@ -75,5 +75,5 @@ jobs:
         shell: pwsh
       - name: Smoke test
         run: |
-          .\dist\Phoneta\Phoneta.exe --version
+          .\dist\Phoneta.exe --version
         shell: pwsh
