@@ -81,9 +81,9 @@ class ResultView(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setHorizontalScrollBarPolicy(
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
 
@@ -91,9 +91,9 @@ class ResultView(QWidget):
         self.flow = QHBoxLayout(self.container)
         self.flow.setSpacing(8)
         self.flow.addStretch()
-        self.scroll.setWidget(self.container)
+        self._scroll.setWidget(self.container)
 
-        layout.addWidget(self.scroll)
+        layout.addWidget(self._scroll)
 
         # Summary line
         self.lbl_summary = QLabel("")
@@ -107,12 +107,14 @@ class ResultView(QWidget):
         # Clear existing cards
         while self.flow.count() > 1:  # stretch is last
             item = self.flow.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
 
         for i, ws in enumerate(words):
             card = _word_card(ws)
-            card.mousePressEvent = self._make_click_handler(i, ws)
+            card.mouseReleaseEvent = self._make_click_handler(i, ws)  # type: ignore[method-assign]
             self.flow.insertWidget(self.flow.count() - 1, card)
 
         if words:
