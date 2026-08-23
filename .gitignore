@@ -32,6 +32,9 @@ htmlcov/
 *.flac
 *.ogg
 
+# Test fixtures — synthetic tones only, no real speech
+!tests/fixtures/*.wav
+
 # Local data
 *.db
 *.sqlite

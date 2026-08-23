@@ -45,7 +45,12 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+norecursedirs = ["tests/smoke"]
 addopts = "-ra"
+markers = [
+    "smoke: real-component integration tests (may download models on first run)",
+    "slow: tests that take >10 seconds",
+]
 
 [tool.ruff]
 line-length = 100

@@ -87,17 +87,34 @@ class VoiceActivityDetector:
     def speech_probability(self, audio: np.ndarray, sample_rate: int = 16000) -> np.ndarray:
         """Return per-frame speech probabilities (0–1) for *audio*.
 
-        The returned array has one value per 30 ms step.
+        The raw silero-vad model expects exactly 512 samples (16 kHz) or 256
+        samples (8 kHz) per call.  This method auto-chunks longer audio and
+        concatenates the results.
         """
         if sample_rate != SILERO_SR:
             audio = _resample(audio, sample_rate, SILERO_SR)
+            sample_rate = SILERO_SR
 
         import torch
 
+        chunk_size = 512 if sample_rate == 16000 else 256
         model = self._model()
-        tensor = torch.from_numpy(audio).float()
+
+        # Pad to a multiple of chunk_size
+        remainder = len(audio) % chunk_size
+        if remainder != 0:
+            pad = np.zeros(chunk_size - remainder, dtype=audio.dtype)
+            audio = np.concatenate([audio, pad])
+
+        probs: list[np.ndarray] = []
         with torch.no_grad():
-            return model(tensor, SILERO_SR).numpy()  # type: ignore[no-any-return]
+            for i in range(0, len(audio), chunk_size):
+                chunk = audio[i : i + chunk_size]
+                tensor = torch.from_numpy(chunk).float()
+                prob = model(tensor, sample_rate).numpy()
+                probs.append(prob)
+
+        return np.concatenate(probs)  # type: ignore[no-any-return]
 
     def find_speech(self, audio: np.ndarray, sample_rate: int = 16000) -> list[SpeechSegment]:
         """Return contiguous speech segments above the threshold.
