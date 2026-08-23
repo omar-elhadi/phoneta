@@ -49,7 +49,7 @@ class ProsodyResult:
 
 
 def _voiced(f0: np.ndarray) -> np.ndarray:
-    return f0[~np.isnan(f0)]
+    return f0[~np.isnan(f0)]  # type: ignore[no-any-return]  # old numpy stubs lack indexing types
 
 
 def boundary_trend(f0: np.ndarray) -> str:
