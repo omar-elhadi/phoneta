@@ -50,7 +50,9 @@ def _install_fakes() -> None:
             query_devices=MagicMock(return_value={"default_samplerate": 16000}),
             rec=MagicMock(),
             wait=MagicMock(),
+            sleep=MagicMock(),
             default=MagicMock(),
+            InputStream=MagicMock(),
         )
         sys.modules["sounddevice"] = fake_sd
 

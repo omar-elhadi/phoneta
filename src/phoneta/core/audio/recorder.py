@@ -100,19 +100,16 @@ class AudioRecorder:
                 samples_since_last_callback = 0
                 self.on_level(current_rms)
 
-        samplerate = int(sd.query_devices(kind="input")["default_samplerate"])
-        if samplerate != self.TARGET_SR:
-            # resampling is cheap enough via sounddevice's built-in converter
-            sd.default.samplerate = self.TARGET_SR
+        sd.default.samplerate = self.TARGET_SR
 
-        sd.rec(
-            int(self.duration_s * self.TARGET_SR),
+        stream = sd.InputStream(
             samplerate=self.TARGET_SR,
             channels=self._CHANNELS,
             dtype="float32",
             callback=_callback,
         )
-        sd.wait()
+        with stream:
+            sd.sleep(int(self.duration_s * 1000))
 
         samples = np.concatenate(frames) if frames else np.array([], dtype=np.float32)
         duration = len(samples) / self.TARGET_SR

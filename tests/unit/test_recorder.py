@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -36,26 +36,41 @@ class TestAudioRecorder:
         assert rec.level_interval_s == 0.05
         assert rec.on_level is None
 
+    def _setup_stream_mocks(self, fake_samples: np.ndarray):
+        """Create mocks for sd.InputStream, sd.sleep, and sd.default.
+
+        The mocked InputStream context-manager fires the callback immediately
+        with the provided fake_samples, simulating a completed recording.
+        """
+        mock_default = MagicMock()
+        mock_default.samplerate = 16000
+
+        def _stream_factory(**kwargs):
+            cb = kwargs.get("callback")
+            stream = MagicMock()
+            if cb:
+                # Fire the callback with all samples at once (like a burst recording)
+                stereo = np.column_stack([fake_samples, fake_samples * 0])
+                cb(stereo.astype(np.float32), len(fake_samples), None, None)
+            stream.__enter__.return_value = stream
+            return stream
+
+        mock_input_stream = MagicMock(side_effect=_stream_factory)
+        mock_sleep = MagicMock()
+
+        return mock_default, mock_input_stream, mock_sleep
+
     def test_recording_pipeline(self) -> None:
-        """Simulate a full recording via mocked sounddevice."""
+        """Simulate a full recording via mocked sounddevice InputStream."""
         fake_samples = np.random.randn(16000).astype(np.float32)  # 1 s
 
+        mock_default, mock_input_stream, mock_sleep = self._setup_stream_mocks(fake_samples)
+
         with (
-            patch("sounddevice.query_devices", return_value={"default_samplerate": 16000}),
-            patch("sounddevice.default") as mock_default,
-            patch("sounddevice.rec") as mock_rec,
-            patch("sounddevice.wait"),
+            patch("sounddevice.default", mock_default),
+            patch("sounddevice.InputStream", mock_input_stream),
+            patch("sounddevice.sleep", mock_sleep),
         ):
-            mock_default.samplerate = 16000
-
-            def capture_side_effect(frames, **kwargs):
-                cb = kwargs.get("callback")
-                if cb:
-                    stereo = np.column_stack([fake_samples[:frames], fake_samples[:frames] * 0])
-                    cb(stereo, frames, None, None)
-
-            mock_rec.side_effect = capture_side_effect
-
             rec = AudioRecorder(duration_s=1.0)
             result = rec.record()
 
@@ -69,23 +84,26 @@ class TestAudioRecorder:
         callback_values: list[float] = []
         fake_samples = np.random.randn(96000).astype(np.float32)  # 6 s
 
+        mock_default = MagicMock()
+        mock_default.samplerate = 16000
+
+        def _stream_factory(**kwargs):
+            cb = kwargs.get("callback")
+            stream = MagicMock()
+            if cb:
+                # Deliver in small blocks like real sounddevice does
+                for start in range(0, len(fake_samples), 1024):
+                    block = fake_samples[start : start + 1024]
+                    stereo = np.column_stack([block, block * 0])
+                    cb(stereo.astype(np.float32), len(block), None, None)
+            stream.__enter__.return_value = stream
+            return stream
+
         with (
-            patch("sounddevice.query_devices", return_value={"default_samplerate": 16000}),
-            patch("sounddevice.default"),
-            patch("sounddevice.rec") as mock_rec,
-            patch("sounddevice.wait"),
+            patch("sounddevice.default", mock_default),
+            patch("sounddevice.InputStream", MagicMock(side_effect=_stream_factory)),
+            patch("sounddevice.sleep", MagicMock()),
         ):
-            def capture_side_effect(frames, **kwargs):
-                cb = kwargs.get("callback")
-                if cb:
-                    # Deliver in small blocks like real sounddevice does
-                    for start in range(0, frames, 1024):
-                        block = fake_samples[start : start + 1024]
-                        stereo = np.column_stack([block, block * 0])
-                        cb(stereo, len(block), None, None)
-
-            mock_rec.side_effect = capture_side_effect
-
             AudioRecorder(
                 duration_s=6.0, level_interval_s=0.1,
                 on_level=callback_values.append,
@@ -96,10 +114,12 @@ class TestAudioRecorder:
             assert all(isinstance(v, float) for v in callback_values)
 
     def test_no_callback_does_not_crash(self) -> None:
+        mock_default = MagicMock()
+        mock_default.samplerate = 16000
+
         with (
-            patch("sounddevice.query_devices", return_value={"default_samplerate": 16000}),
-            patch("sounddevice.default"),
-            patch("sounddevice.rec"),
-            patch("sounddevice.wait"),
+            patch("sounddevice.default", mock_default),
+            patch("sounddevice.InputStream", MagicMock()),
+            patch("sounddevice.sleep", MagicMock()),
         ):
             AudioRecorder(duration_s=0.1, on_level=None).record()
