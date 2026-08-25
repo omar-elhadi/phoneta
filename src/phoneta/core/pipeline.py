@@ -18,6 +18,7 @@ not here, so the pipeline module itself is always importable.
 
 from __future__ import annotations
 
+import re
 import tempfile
 import wave
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ from phoneta.core.alignment.mfa import ForcedAligner, PhonemeSegment
 from phoneta.core.alignment.sequence import align as nw_align
 from phoneta.core.audio.vad import VoiceActivityDetector
 from phoneta.core.metrics.prosody import ProsodyResult
-from phoneta.core.metrics.scoring import WordScore, score_word
+from phoneta.core.metrics.scoring import GREEN_THRESHOLD, PhonemeFeedback, WordScore, score_word
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,80 @@ def _segment_word_index_map(
 def _segments_to_user_tokens(segs: list[PhonemeSegment]) -> list[str]:
     """Extract phoneme tokens from a group of segments."""
     return [s.phoneme for s in segs]
+
+
+_WORD_RE = re.compile(r"[^\W\d_]+(?:['\u2019-][^\W\d_]+)*|\d+(?:[.,]\d+)*", re.UNICODE)
+
+
+def _score_words_fallback(
+    word_ipas: list[WordIPA],
+    transcribed_text: str,
+    prosody: ProsodyResult,
+) -> list[WordScore]:
+    """Score each target word against the ASR transcription (word level).
+
+    Used when forced alignment falls back to uniform word timing (no
+    phoneme-level signal).  Target words are globally aligned to the spoken
+    words with the same Needleman-Wunsch algorithm used for phonemes, so
+    substituted / deleted words turn red while correctly-spoken words stay
+    green (or yellow on a prosody issue).
+    """
+    target_words = [wip.word for wip in word_ipas]
+    spoken_words = [w.lower() for w in _WORD_RE.findall(transcribed_text.lower())]
+
+    alignment = nw_align(target_words, spoken_words)
+    ref_columns = [p for p in alignment if p.ref is not None]
+
+    scores: list[WordScore] = []
+    for wip, pair in zip(word_ipas, ref_columns, strict=True):
+        is_last = wip is word_ipas[-1]
+        prosody_issue = is_last and not prosody.boundary_rise
+        feedback = (
+            PhonemeFeedback(
+                ref=pair.ref,
+                user=pair.user,
+                kind=pair.kind,
+                confidence=1.0,
+                flagged=pair.is_error,
+            ),
+        )
+        accuracy = 1.0 if pair.kind == "match" else 0.0
+        scores.append(
+            WordScore(
+                word=wip.word,
+                accuracy=accuracy,
+                color=_color_for_fallback(accuracy, feedback, prosody_issue),
+                feedback=feedback,
+            )
+        )
+    return scores
+
+
+def _color_for_fallback(
+    accuracy: float,
+    feedback: tuple[PhonemeFeedback, ...],
+    prosody_issue: bool = False,
+) -> str:
+    """Colour rule for word-level fallback scoring.
+
+    Mirrors :func:`phoneta.core.metrics.scoring._color` — any flagged phoneme
+    or accuracy below the red bar makes the word red; otherwise a prosody
+    issue makes it yellow; otherwise accuracy decides green vs yellow.
+    """
+    from phoneta.core.metrics.scoring import (
+        GREEN,
+        RED,
+        RED_THRESHOLD,
+        YELLOW,
+    )
+
+    if any(f.flagged for f in feedback) or accuracy < RED_THRESHOLD:
+        return RED
+    if prosody_issue:
+        return YELLOW
+    if accuracy >= GREEN_THRESHOLD:
+        return GREEN
+    return YELLOW
 
 
 def _score_words(
@@ -182,26 +257,32 @@ def run_pipeline(
 
     try:
         # ---- audio ingestion -------------------------------------------------
+        target_text = target_text.strip()
+        if not target_text:
+            raise ValueError("target_text must not be empty")
+
         if audio_samples is not None:
+            if len(audio_samples) == 0:
+                raise ValueError("audio_samples must not be empty")
             wav_path = Path(temp_dir) / "recording.wav"
             _write_wav(audio_samples, sample_rate, str(wav_path))
             own_path = True
+            orig_audio = audio_samples
         elif audio_path is not None:
             wav_path = Path(audio_path)
+            # Never assume 16 kHz — read the real sample rate from the header.
+            with wave.open(str(wav_path), "rb") as wf:
+                if wf.getnframes() == 0:
+                    raise ValueError(f"audio file is empty: {wav_path}")
+                sample_rate = wf.getframerate()
+                raw = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
+            orig_audio = raw.astype(np.float32) / 32768.0
         else:
             raise ValueError("One of audio_path or audio_samples is required")
 
         # ---- silence trim ----------------------------------------------------
         vad = VoiceActivityDetector(threshold=vad_threshold)
-        trimmed_samples: np.ndarray
-        if audio_samples is not None:
-            trimmed_samples = _trim(vad, audio_samples, sample_rate)
-        else:
-            # Read WAV into samples for VAD; keep originals for prosody.
-            with wave.open(str(wav_path), "rb") as wf:
-                raw = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
-            orig_audio = raw.astype(np.float32) / 32768.0
-            trimmed_samples = _trim(vad, orig_audio, sample_rate)
+        trimmed_samples = _trim(vad, orig_audio, sample_rate)
 
         trimmed_wav = Path(temp_dir) / "trimmed.wav"
         trimmed_duration = _write_wav(trimmed_samples, sample_rate, str(trimmed_wav))
@@ -222,19 +303,25 @@ def run_pipeline(
             str(trimmed_wav), target_text, trimmed_duration
         )
 
-        # ---- per-word scoring ------------------------------------------------
-        segment_groups = _segment_word_index_map(
-            alignment_result.segments, word_ipas
-        )
-
         # ---- prosody ---------------------------------------------------------
         from phoneta.core.metrics.prosody import extract_f0
 
         # Run prosody on the trimmed audio (better signal for F0)
         prosody = extract_f0(trimmed_samples, sample_rate)
 
-        # ---- score -----------------------------------------------------------
-        word_scores = _score_words(word_ipas, segment_groups, prosody)
+        # ---- per-word scoring ------------------------------------------------
+        if alignment_result.method == "fallback":
+            # Word-level fallback has no phoneme signal — score each target
+            # word against the ASR transcription instead of against IPA, so
+            # the UI shows honest colours rather than everything-red.
+            word_scores = _score_words_fallback(
+                word_ipas, transcription.text, prosody
+            )
+        else:
+            segment_groups = _segment_word_index_map(
+                alignment_result.segments, word_ipas
+            )
+            word_scores = _score_words(word_ipas, segment_groups, prosody)
 
         # ---- clean-up --------------------------------------------------------
         audio_deleted = False

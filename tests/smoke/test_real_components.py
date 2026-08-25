@@ -40,6 +40,7 @@ def _read_fixture() -> np.ndarray:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.smoke
 class TestSileroVADReal:
     """Exercise the real silero-vad model (loaded via torch.hub)."""
 
@@ -94,6 +95,7 @@ class TestSileroVADReal:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.smoke
 class TestFasterWhisperReal:
     """Exercise faster-whisper with the ``tiny`` model (~39 MB download)."""
 
@@ -127,6 +129,7 @@ class TestFasterWhisperReal:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.smoke
 class TestLibrosaPyinReal:
     """Exercise librosa.pyin F0 extraction on fixture audio."""
 
@@ -167,6 +170,7 @@ class TestLibrosaPyinReal:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.smoke
 class TestPhonemizerReal:
     """Exercise phonemizer + espeak-ng if the system package is installed."""
 
@@ -237,6 +241,7 @@ class TestPhonemizerReal:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.smoke
 class TestSoundDeviceReal:
     """Exercise sounddevice — query devices, check no crash."""
 

@@ -125,3 +125,35 @@ class TestTrimSilence:
         with patch("torch.hub.load", return_value=(mock_model, mock_utils)):
             trimmed = trim_silence(audio)
             assert len(trimmed) == len(audio)
+
+    def test_non_16k_sample_rate_coordinates_scaled(self) -> None:
+        """Regression: ``find_speech`` reports 16 kHz timestamps; trimming a
+        22.05 kHz signal must scale them back before slicing, or the crop is
+        wrong by the rate factor.
+        """
+        sr = 22050
+        # 1 s silence + 1 s tone + 1 s silence at 22050 Hz.
+        audio = np.concatenate([_silence(1.0, sr), _sine(1.0, sr), _silence(1.0, sr)])
+
+        # Silence frames at 16 kHz coordinate space (silero's internal rate).
+        # Speech spans 16k samples (1 s) at 16k coordinates → 22050 samples at 22k.
+        probs = np.array([0.0] * 32 + [0.9] * 32 + [0.0] * 32, dtype=np.float32)
+        mock_model, mock_utils = _mock_silero(probs)
+
+        with patch("torch.hub.load", return_value=(mock_model, mock_utils)):
+            trimmed = trim_silence(audio, sample_rate=sr)
+
+        # Speech region is 22050 samples (1 s @ 22.05k); pad 800 @ 16k → 1102 @ 22k.
+        expected = 22050 + 2 * int(800 * sr / 16000)
+        # Mock frame boundaries have 512-sample (16k) granularity → allow slack.
+        assert abs(len(trimmed) - expected) <= 1200, (
+            f"trimmed {len(trimmed)} samples, expected ~{expected} "
+            "(coordinates must be scaled from 16k to input rate)"
+        )
+        # Without the scale fix the crop would be ~17k (16k coordinates on
+        # a 22.05k signal) — assert we're clearly past that.
+        assert len(trimmed) > 20000
+        # All the tone survives.
+        assert np.count_nonzero(np.abs(trimmed) > 0.01) == np.count_nonzero(
+            np.abs(audio) > 0.01
+        )

@@ -68,15 +68,17 @@ class Transcriber:
 
         try:
             segments, info = model.transcribe(path, word_timestamps=True)
+            seg_list = list(segments)  # materialize — it's a lazy generator
             words = tuple(
                 WordTimestamp(word=w.word, start_s=float(w.start), end_s=float(w.end))
-                for segment in segments
+                for segment in seg_list
                 for w in (segment.words or [])
             )
         except TypeError:
             segments, info = model.transcribe(path)
+            seg_list = list(segments)
             words = ()
 
-        text = " ".join(seg.text.strip() for seg in segments).strip()
+        text = " ".join(seg.text.strip() for seg in seg_list).strip()
         language = getattr(info, "language", None)
         return Transcription(text=text, language=language, words=words)

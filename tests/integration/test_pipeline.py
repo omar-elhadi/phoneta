@@ -304,6 +304,170 @@ class TestPipelineFallback:
         hello = result.words[0]
         assert hello.word == "hello"
 
+    def test_fallback_uses_asr_for_word_colors(self):
+        """Fallback scores target words against the transcription: a word the
+        ASR heard differently turns red, a correctly-heard word stays green.
+        """
+        audio = np.zeros(16000, dtype=np.float32)
+
+        # ASR heard "hello there" — world is misheard as there.
+        misheard = _canned_transcription()
+        misheard = misheard.__class__(
+            text="hello there",
+            language="en",
+            words=(
+                misheard.words[0],
+                misheard.words[1],
+            ),
+        )
+
+        fallback_align = AlignmentResult(
+            segments=(
+                PhonemeSegment(phoneme="hello", start_s=0.0, end_s=0.5, confidence=1.0),
+                PhonemeSegment(phoneme="world", start_s=0.5, end_s=1.0, confidence=1.0),
+            ),
+            method="fallback",
+        )
+
+        with (
+            patch(
+                "phoneta.core.audio.vad.VoiceActivityDetector.find_speech",
+                side_effect=_canned_vad_find_speech,
+            ),
+            patch(
+                "phoneta.core.alignment.asr.Transcriber.transcribe",
+                return_value=misheard,
+            ),
+            patch(
+                "phoneta.core.alignment.g2p.TextToIPA.phonemize",
+                return_value=_canned_g2p(),
+            ),
+            patch(
+                "phoneta.core.alignment.mfa.ForcedAligner.align",
+                return_value=fallback_align,
+            ),
+            patch(
+                "phoneta.core.metrics.prosody.extract_f0",
+                return_value=_canned_prosody(),
+            ),
+        ):
+            result = run_pipeline(
+                target_text="hello world",
+                lang="en",
+                audio_samples=audio,
+            )
+
+        hello, world = result.words
+        assert hello.color == "green"  # "hello" heard correctly
+        assert world.color == "red"  # "world" misheard as "there"
+        assert world.accuracy == 0.0
+
+    def test_fallback_all_red_when_nothing_spoken(self):
+        """Empty transcription → every target word is a deletion (red)."""
+        audio = np.zeros(16000, dtype=np.float32)
+
+        empty = _canned_transcription().__class__(
+            text="", language=None, words=()
+        )
+        fallback_align = AlignmentResult(segments=(), method="fallback")
+
+        with (
+            patch(
+                "phoneta.core.audio.vad.VoiceActivityDetector.find_speech",
+                side_effect=_canned_vad_find_speech,
+            ),
+            patch(
+                "phoneta.core.alignment.asr.Transcriber.transcribe",
+                return_value=empty,
+            ),
+            patch(
+                "phoneta.core.alignment.g2p.TextToIPA.phonemize",
+                return_value=_canned_g2p(),
+            ),
+            patch(
+                "phoneta.core.alignment.mfa.ForcedAligner.align",
+                return_value=fallback_align,
+            ),
+            patch(
+                "phoneta.core.metrics.prosody.extract_f0",
+                return_value=_canned_prosody(),
+            ),
+        ):
+            result = run_pipeline(
+                target_text="hello world",
+                lang="en",
+                audio_samples=audio,
+            )
+
+        assert all(w.color == "red" for w in result.words)
+
+
+class TestPipelineInputValidation:
+    def test_empty_target_text_raises(self):
+        audio = np.zeros(16000, dtype=np.float32)
+        with pytest.raises(ValueError, match="target_text"):
+            run_pipeline(target_text="   \n  ", lang="en", audio_samples=audio)
+
+    def test_empty_audio_samples_raises(self):
+        empty = np.array([], dtype=np.float32)
+        with pytest.raises(ValueError, match="audio_samples"):
+            run_pipeline(target_text="hello", lang="en", audio_samples=empty)
+
+    def test_empty_wav_file_raises(self, tmp_path: Path):
+        """A WAV with zero frames is rejected up front."""
+        wav_path = tmp_path / "empty.wav"
+        with wave.open(str(wav_path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+
+        with pytest.raises(ValueError, match="empty"):
+            run_pipeline(target_text="hello", lang="en", audio_path=str(wav_path))
+
+
+class TestPipelineSampleRate:
+    def test_wav_sample_rate_read_from_header(self, tmp_path: Path):
+        """The pipeline must read the true WAV rate, never assume 16 kHz."""
+        wav_path = tmp_path / "22k.wav"
+        _sine_wav(str(wav_path), duration_s=1.0, sr=22050)
+
+        seen: dict[str, float] = {}
+
+        def _fake_trim(vad, audio, sample_rate):
+            seen["sample_rate"] = sample_rate
+            return audio
+
+        with (
+            patch(
+                "phoneta.core.pipeline._trim",
+                side_effect=_fake_trim,
+            ),
+            patch(
+                "phoneta.core.alignment.asr.Transcriber.transcribe",
+                return_value=_canned_transcription(),
+            ),
+            patch(
+                "phoneta.core.alignment.g2p.TextToIPA.phonemize",
+                return_value=_canned_g2p(),
+            ),
+            patch(
+                "phoneta.core.alignment.mfa.ForcedAligner.align",
+                return_value=_canned_alignment(),
+            ),
+            patch(
+                "phoneta.core.metrics.prosody.extract_f0",
+                return_value=_canned_prosody(),
+            ),
+        ):
+            run_pipeline(
+                target_text="hello world",
+                lang="en",
+                audio_path=str(wav_path),
+                delete_audio=False,
+            )
+
+        assert seen["sample_rate"] == 22050
+
     def test_oov_handled_gracefully(self):
         """OOV words (no IPA) get a neutral green score with no feedback."""
         audio = np.zeros(16000, dtype=np.float32)

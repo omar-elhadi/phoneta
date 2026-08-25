@@ -33,6 +33,31 @@ class TestTranscriber:
         assert result.words[0].start_s == 0.0
         assert result.words[0].end_s == 0.5
 
+    def test_transcribe_with_lazy_generator_segments(self) -> None:
+        """faster-whisper yields segments lazily — consuming them for word
+        timestamps must NOT leave the text empty (regression: the generator
+        was exhausted before ``text`` was joined).
+        """
+
+        def _segments():
+            seg = MagicMock()
+            seg.text = "hello world"
+            seg.words = [MagicMock(word="hello", start=0.0, end=0.5)]
+            yield seg
+
+        mock_info = MagicMock()
+        mock_info.language = "en"
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = (_segments(), mock_info)
+
+        with patch("faster_whisper.WhisperModel", return_value=mock_model):
+            result = Transcriber().transcribe("fake.wav")
+
+        assert result.text == "hello world"  # "" before the fix
+        assert result.language == "en"
+        assert len(result.words) == 1
+        assert result.words[0].word == "hello"
+
     def test_transcribe_no_word_timestamps(self) -> None:
         """Falls back when word_timestamps is not supported."""
         mock_seg = MagicMock()

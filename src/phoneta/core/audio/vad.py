@@ -165,8 +165,11 @@ def trim_silence(
     if not segments:
         return audio  # nothing to trim
 
-    start = max(0, segments[0].start_sample - pad_samples)
-    end = min(len(audio), segments[-1].end_sample + pad_samples)
+    # ``find_speech`` always reports timestamps at SILERO_SR (16 kHz), so
+    # scale back to the input sample rate before slicing.
+    scale = sample_rate / SILERO_SR
+    start = max(0, int((segments[0].start_sample - pad_samples) * scale))
+    end = min(len(audio), int((segments[-1].end_sample + pad_samples) * scale))
     return audio[start:end]
 
 
