@@ -131,6 +131,9 @@ def _install_fakes() -> None:
         class _FakeQWidget:
             """A QWidget stub whose __init__ accepts optional parent."""
 
+            class Shape:
+                StyledPanel = 6
+
             def __init__(self, parent: object = None) -> None:
                 pass
 
@@ -174,6 +177,15 @@ def _install_fakes() -> None:
             def setObjectName(self, name: str) -> None:
                 self._object_name = name
 
+            def setFrameShape(self, shape: object) -> None:
+                pass
+
+            def setCursor(self, cursor: object) -> None:
+                pass
+
+            def deleteLater(self) -> None:
+                pass
+
             def objectName(self) -> str:
                 return getattr(self, "_object_name", "")
 
@@ -190,6 +202,9 @@ def _install_fakes() -> None:
                     self.setText(text)
 
             def setWordWrap(self, w: bool) -> None:
+                pass
+
+            def setAlignment(self, alignment: object) -> None:
                 pass
 
         class _FakeQDialog(_FakeQWidget):
@@ -259,12 +274,23 @@ def _install_fakes() -> None:
             def currentText(self) -> str:
                 return "English"
 
+        class _FakeQScrollArea(_FakeQWidget):
+            def setWidgetResizable(self, resizable: bool) -> None:
+                pass
+
+            def setWidget(self, widget: object) -> None:
+                pass
+
+            def setHorizontalScrollBarPolicy(self, policy: object) -> None:
+                pass
+
         _wid = _module(
             "PySide6.QtWidgets",
             QApplication=MagicMock(),
             QComboBox=_FakeQComboBox,
             QDialog=_FakeQDialog,
             QFrame=_FakeQWidget,
+            QGridLayout=MagicMock(),
             QGroupBox=_FakeQWidget,
             QHBoxLayout=MagicMock(),
             QHeaderView=MagicMock(),
@@ -274,7 +300,7 @@ def _install_fakes() -> None:
             QMessageBox=MagicMock(),
             QProgressBar=_FakeQProgressBar,
             QPushButton=_FakeQPushButton,
-            QScrollArea=_FakeQWidget,
+            QScrollArea=_FakeQScrollArea,
             QSizePolicy=MagicMock(),
             QTableWidget=_FakeQWidget,
             QTableWidgetItem=MagicMock(),
