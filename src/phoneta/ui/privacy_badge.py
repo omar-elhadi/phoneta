@@ -21,17 +21,6 @@ class PrivacyBadge(QWidget):
 
         label = QLabel("\U0001f512 100% Offline Mode")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # styled centrally via QLabel#privacy_badge in ui/theme.py
         label.setObjectName("privacy_badge")
-        label.setStyleSheet(
-            """
-            QLabel#privacy_badge {
-                color: #2e7d32;
-                background: #e8f5e9;
-                border: 1px solid #a5d6a7;
-                border-radius: 6px;
-                padding: 4px 16px;
-                font-weight: bold;
-            }
-            """
-        )
         layout.addWidget(label)

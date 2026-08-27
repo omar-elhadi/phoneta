@@ -5,6 +5,16 @@ from __future__ import annotations
 import sys
 
 
+def _version() -> str:
+    """Resolve the package version without importing heavy deps."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("phoneta")
+    except PackageNotFoundError:
+        return "0.0.0"
+
+
 def run() -> int:
     """Create and run the Qt application."""
     from PySide6.QtWidgets import QApplication
@@ -14,22 +24,10 @@ def run() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Phoneta")
     app.setOrganizationName("Phoneta")
-    app.setApplicationVersion("0.1.0")
+    app.setApplicationVersion(_version())
+    from phoneta.ui.theme import build_stylesheet
 
-    # Dark-friendly base style
-    app.setStyleSheet(
-        """
-        QMainWindow { background: #fafafa; }
-        QLabel { color: #212121; }
-        QLineEdit, QComboBox { padding: 4px; }
-        QPushButton {
-            background: #1565c0; color: white; border: none;
-            border-radius: 6px; padding: 6px 20px; font-weight: bold;
-        }
-        QPushButton:hover { background: #1976d2; }
-        QPushButton:disabled { background: #90caf9; }
-        """
-    )
+    app.setStyleSheet(build_stylesheet())
 
     # ── first-run model setup ──────────────────────────────────
     from phoneta.models.registry import all_present
