@@ -1,5 +1,6 @@
 import pytest
 
+from phoneta import __version__
 from phoneta.__main__ import build_parser, main
 
 
@@ -18,4 +19,4 @@ def test_version_flag_exits_zero(capsys) -> None:
     with pytest.raises(SystemExit) as exc:
         main(["--version"])
     assert exc.value.code == 0
-    assert "0.1.0" in capsys.readouterr().out
+    assert __version__ in capsys.readouterr().out

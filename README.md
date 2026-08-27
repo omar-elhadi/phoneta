@@ -7,11 +7,28 @@ phoneme level, and shows color-coded per-word/phoneme feedback plus pitch-contou
 (prosody) analysis. Everything runs locally: no network calls, no telemetry, and
 raw audio is deleted immediately after analysis.
 
+## How It Works
+
+1. **Type a phrase** (remembered for next time) and pick the language.
+2. **Press Record** — one big toggle button with a live countdown and a
+   colour-coded volume meter.
+3. Recording stops automatically (or press Stop) and analysis runs instantly.
+4. **Read your feedback**: every word is a coloured card — green = good,
+   yellow = close, red = needs work — with an overall score banner.
+5. **Tap any word** for the phoneme inspector: reference vs. your IPA,
+   per-phoneme confidence, and prosody stats.
+6. Edit the phrase and hit **Re-analyse** to score a new attempt against the
+   same recording.
+
+Everything is explained in-app under **ℹ About**, and errors come with
+actionable hints (e.g. how to install a missing component).
+
 ## Status
 
-MVP complete: recording, ASR, forced alignment, scoring, prosody, PySide6 UI,
-SQLite history, model downloader, and offline-audit gate. See the [spec](./speech-pronunciation-evaluator-spec.md),
-[plan](./speech-pronunciation-evaluator-plan.md), and [tasks](./speech-pronunciation-evaluator-tasks.md) for full details.
+v0.2.0 — MVP complete plus production UI polish: centralised design system,
+recorder/results UX, settings persistence, desktop entry, and app icon. See the
+[spec](./speech-pronunciation-evaluator-spec.md), [plan](./speech-pronunciation-evaluator-plan.md),
+and [tasks](./speech-pronunciation-evaluator-tasks.md) for full details.
 
 ## Requirements
 
@@ -76,12 +93,21 @@ python -m phoneta                   # GUI (same as `phoneta`)
 ## Tests
 
 ```bash
-pytest                              # 127 tests (unit + integration)
+pytest                              # unit + integration (faked ML deps)
 pytest tests/smoke/                 # Real ML components (needs models installed)
 
 ruff check .                        # Lint
 mypy src                            # Type-check
 python -m compileall -q src tests   # Syntax-check
+```
+
+## Desktop Integration (Linux)
+
+Install a launcher entry so Phoneta shows up in your app menu:
+
+```bash
+sudo cp packaging/phoneta.desktop /usr/share/applications/
+sudo cp src/phoneta/assets/phoneta.svg /usr/share/icons/hicolor/scalable/apps/phoneta.svg
 ```
 
 ## Benchmark
@@ -104,6 +130,7 @@ PYTHONPATH=src python scripts/benchmark_latency.py
 ```
 src/phoneta/
 ├── app.py              # QApplication bootstrap + model check
+├── assets/             # app icon (SVG, bundled with the package)
 ├── core/
 │   ├── audio/          # recorder (sounddevice), VAD (silero)
 │   ├── alignment/      # g2p (phonemizer), ASR (faster-whisper), MFA, sequence
@@ -111,7 +138,8 @@ src/phoneta/
 │   └── pipeline.py     # end-to-end orchestration
 ├── models/             # registry + checksums
 ├── storage/            # SQLite practice history
-└── ui/                 # PySide6: main, recorder, results, inspector, privacy badge
+└── ui/                 # PySide6: theme, main window, recorder, results,
+                        # inspector, privacy badge, setup screen, icon
 ```
 
 ## Packaging

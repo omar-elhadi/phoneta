@@ -67,12 +67,15 @@ try:
 except Exception:
     LIBROSA_DATA = []
 
+# App icon asset (bundled inside the phoneta package)
+ICON_DATA = [(str(SRC / "phoneta" / "assets" / "phoneta.svg"), "phoneta/assets")]
+
 # ── spec ───────────────────────────────────────────────────────────
 a = Analysis(
     [str(SRC / "phoneta" / "__main__.py")],
     pathex=[str(SRC)],
     binaries=BINARIES,
-    datas=PHONEMIZER_DATA + LIBROSA_DATA,
+    datas=PHONEMIZER_DATA + LIBROSA_DATA + ICON_DATA,
     hiddenimports=HIDDEN_IMPORTS,
     hookspath=[],
     hooksconfig={},

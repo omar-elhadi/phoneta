@@ -29,6 +29,12 @@ def run() -> int:
 
     app.setStyleSheet(build_stylesheet())
 
+    from phoneta.ui.icon import app_icon
+
+    icon = app_icon()
+    if icon is not None:
+        app.setWindowIcon(icon)
+
     # ── first-run model setup ──────────────────────────────────
     from phoneta.models.registry import all_present
     from phoneta.ui.setup_screen import SetupScreen

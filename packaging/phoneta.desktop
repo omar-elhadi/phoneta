@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Phoneta
+GenericName=Pronunciation Coach
+Comment=Offline, privacy-first pronunciation practice with phoneme-level feedback
+Exec=phoneta
+Icon=phoneta
+Terminal=false
+Categories=Education;Languages;AudioVideo;
+Keywords=pronunciation;speech;language;learning;offline;
