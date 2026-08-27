@@ -1,10 +1,13 @@
 """Recorder view — microphone controls and live level meter.
 
 Runs the :class:`~phoneta.core.audio.recorder.AudioRecorder` on a background
-thread so the UI stays responsive.
+thread so the UI stays responsive.  Design logic lives in pure helpers so it
+is unit-testable without a display server.
 """
 
 from __future__ import annotations
+
+import time
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
@@ -17,6 +20,19 @@ from PySide6.QtWidgets import (
 )
 
 from phoneta.core.audio.recorder import AudioRecorder, RecordResult
+from phoneta.ui.theme import meter_color
+
+
+def format_elapsed(elapsed: float, total: float) -> str:
+    """Human countdown label, e.g. ``0:04 / 0:10``."""
+    e = max(0, int(elapsed))
+    t = max(0, int(total))
+    return f"{e // 60}:{e % 60:02d} / {t // 60}:{t % 60:02d}"
+
+
+def meter_value(rms: float) -> int:
+    """Map RMS (speech range ≈ 0..0.5) onto a 0-100 progress value."""
+    return min(int(max(rms, 0.0) * 200), 100)
 
 
 class _RecordWorker(QThread):
@@ -52,58 +68,67 @@ class _RecordWorker(QThread):
 
 
 class RecorderView(QWidget):
-    """Mic input area: record/stop, level meter, duration label."""
+    """Mic input area: one toggle button, countdown, colour-coded meter."""
 
     recording_done = Signal(object)  # RecordResult
 
     MAX_DURATION_S = 10.0
+    _HINT = "Type a phrase above, then press Record and speak."
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._worker: _RecordWorker | None = None
+        self._t0: float = 0.0
         self._build_ui()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        # ── top row: record button + duration ──────────────────────
+        # ── top row: single toggle button + countdown ──────────────
         top = QHBoxLayout()
-        self.btn_record = QPushButton("\U0001f3a4 Record")
-        self.btn_record.clicked.connect(self._start_recording)
-        self.btn_record.setMinimumHeight(44)
+        self.btn_record = QPushButton("\U0001f3a4  Record")
+        self.btn_record.setObjectName("record")
+        self.btn_record.setToolTip("Click to start recording — click again to stop early")
+        self.btn_record.clicked.connect(self._toggle_recording)
+        self.btn_record.setMinimumHeight(48)
         top.addWidget(self.btn_record)
 
-        self.btn_stop = QPushButton("\u23f9 Stop")
-        self.btn_stop.clicked.connect(self._stop_recording)
-        self.btn_stop.setEnabled(False)
-        self.btn_stop.setMinimumHeight(44)
-        top.addWidget(self.btn_stop)
-
-        self.lbl_duration = QLabel("0.0 s")
-        self.lbl_duration.setStyleSheet("font-size: 14px;")
+        self.lbl_duration = QLabel(format_elapsed(0.0, self.MAX_DURATION_S))
+        self.lbl_duration.setStyleSheet("font-size: 16px; font-weight: 600;")
+        self.lbl_duration.setToolTip("Elapsed / maximum recording length")
         top.addWidget(self.lbl_duration)
         top.addStretch()
         layout.addLayout(top)
 
-        # ── level meter ───────────────────────────────────────────
+        # ── level meter ─────────────────────────────────────────────
         self.level_meter = QProgressBar()
         self.level_meter.setRange(0, 100)
         self.level_meter.setValue(0)
         self.level_meter.setTextVisible(False)
-        self.level_meter.setMaximumHeight(16)
+        self.level_meter.setMaximumHeight(14)
         layout.addWidget(self.level_meter)
 
-        # ── status ─────────────────────────────────────────────────
-        self.lbl_status = QLabel("Ready — select target text and press Record")
+        # ── status ──────────────────────────────────────────────────
+        self.lbl_status = QLabel(self._HINT)
         self.lbl_status.setWordWrap(True)
         layout.addWidget(self.lbl_status)
 
-    # ── slots ──────────────────────────────────────────────────────────
+    # ── slots ───────────────────────────────────────────────────────────
+
+    def is_recording(self) -> bool:
+        return self._worker is not None
+
+    def _toggle_recording(self) -> None:
+        if self.is_recording():
+            self._stop_recording()
+        else:
+            self._start_recording()
 
     def _start_recording(self) -> None:
-        self.btn_record.setEnabled(False)
-        self.btn_stop.setEnabled(True)
+        self._t0 = time.monotonic()
+        self.btn_record.setText("\u23f9  Stop & analyse")
         self.lbl_status.setText("Recording … speak now.")
+        self._set_meter(0.0)
 
         self._worker = _RecordWorker(
             duration_s=self.MAX_DURATION_S,
@@ -118,28 +143,36 @@ class RecorderView(QWidget):
             self._worker.terminate()
             self._worker.wait(1000)
         self._reset_ui()
-        self.lbl_status.setText("Recording stopped.")
+        self.lbl_status.setText("Recording stopped — nothing analysed.")
 
     def _on_level(self, rms: float) -> None:
-        # Normalise RMS to 0-100 (clamp reasonable speech range 0..0.5)
-        value = min(int(rms * 200), 100)
-        self.level_meter.setValue(value)
-        # Update duration from worker elapsed if possible
-        # (simplistic — just pulse the meter, worker handles actual duration)
+        self._set_meter(rms)
+        elapsed = time.monotonic() - self._t0
+        self.lbl_duration.setText(format_elapsed(elapsed, self.MAX_DURATION_S))
+
+    def _set_meter(self, rms: float) -> None:
+        self.level_meter.setValue(meter_value(rms))
+        self.level_meter.setStyleSheet(
+            f"QProgressBar::chunk {{ background: {meter_color(rms)}; }}"
+        )
 
     def _on_done(self, result: object) -> None:
         self._reset_ui()
         if isinstance(result, Exception):
-            self.lbl_status.setText(f"Recording error: {result}")
+            self.lbl_status.setText(
+                "Recording error: no microphone found or access denied. "
+                "Check that a mic is connected and try again."
+            )
             return
         assert isinstance(result, RecordResult)
-        self.lbl_status.setText(
-            f"Recorded {result.duration_s:.1f} s — analysing …"
-        )
+        if result.duration_s < 0.3:
+            self.lbl_status.setText("Too short — hold Record a bit longer and speak.")
+            return
+        self.lbl_status.setText(f"Recorded {result.duration_s:.1f} s — analysing …")
         self.recording_done.emit(result)
 
     def _reset_ui(self) -> None:
-        self.btn_record.setEnabled(True)
-        self.btn_stop.setEnabled(False)
+        self.btn_record.setText("\U0001f3a4  Record")
         self.level_meter.setValue(0)
+        self.lbl_duration.setText(format_elapsed(0.0, self.MAX_DURATION_S))
         self._worker = None

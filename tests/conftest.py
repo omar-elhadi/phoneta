@@ -75,11 +75,41 @@ def _install_fakes() -> None:
 
     if "PySide6" not in sys.modules:
         class _FakeSignal:
+            """Class-level signal declaration with per-instance binding."""
+
             def __init__(self, *types: object) -> None:
-                pass
+                self._name = ""
+
+            def __set_name__(self, owner: type, name: str) -> None:
+                self._name = "_signal_" + name
+
+            def __get__(self, obj: object, objtype: type | None = None) -> object:
+                if obj is None:
+                    return self
+                bound = getattr(obj, self._name, None)
+                if bound is None:
+                    bound = _BoundSignal()
+                    setattr(obj, self._name, bound)
+                return bound
 
             def connect(self, *args: object) -> None:
                 pass
+
+            def emit(self, *args: object) -> None:
+                pass
+
+        class _BoundSignal:
+            """Instance-bound signal with working connect/emit."""
+
+            def __init__(self) -> None:
+                self._slots: list[object] = []
+
+            def connect(self, slot: object) -> None:
+                self._slots.append(slot)
+
+            def emit(self, *args: object) -> None:
+                for slot in list(self._slots):
+                    slot(*args)
 
         class _FakeQThread:
             """A QThread stub whose __init__ accepts optional parent."""
@@ -141,15 +171,26 @@ def _install_fakes() -> None:
             def setEnabled(self, v: bool) -> None:
                 pass
 
-            def setText(self, s: str) -> None:
-                pass
+            def setObjectName(self, name: str) -> None:
+                self._object_name = name
 
-        class _FakeQLabel(_FakeQWidget):
-            def setWordWrap(self, w: bool) -> None:
-                pass
+            def objectName(self) -> str:
+                return getattr(self, "_object_name", "")
+
+            def setText(self, s: str) -> None:
+                self._text = s
 
             def text(self) -> str:
-                return ""
+                return getattr(self, "_text", "")
+
+        class _FakeQLabel(_FakeQWidget):
+            def __init__(self, text: object = "", parent: object = None) -> None:
+                super().__init__(parent)
+                if isinstance(text, str):
+                    self.setText(text)
+
+            def setWordWrap(self, w: bool) -> None:
+                pass
 
         class _FakeQDialog(_FakeQWidget):
             """QDialog stub."""
@@ -203,6 +244,12 @@ def _install_fakes() -> None:
                 pass
 
             def setValue(self, v: int) -> None:
+                pass
+
+            def setTextVisible(self, visible: bool) -> None:
+                pass
+
+            def setMaximumHeight(self, h: int) -> None:
                 pass
 
         class _FakeQComboBox(_FakeQWidget):
