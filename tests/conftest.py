@@ -120,12 +120,27 @@ def _install_fakes() -> None:
             def start(self) -> None:
                 pass
 
+        class _FakeQSettings:
+            """QSettings stub with process-wide persistence like the real thing."""
+
+            _store: dict[str, object] = {}
+
+            def __init__(self, *args: object) -> None:
+                pass
+
+            def value(self, key: str, default: object = None, type: object = None) -> object:
+                return self._store.get(key, default)
+
+            def setValue(self, key: str, value: object) -> None:
+                self._store[key] = value
+
         _conv = _module(
             "PySide6.QtCore",
             Signal=_FakeSignal,
             QThread=_FakeQThread,
             Qt=MagicMock(),
             QObject=MagicMock(),
+            QSettings=_FakeQSettings,
         )
 
         class _FakeQWidget:
@@ -133,6 +148,8 @@ def _install_fakes() -> None:
 
             class Shape:
                 StyledPanel = 6
+
+            returnPressed = _FakeSignal()
 
             def __init__(self, parent: object = None) -> None:
                 pass
@@ -172,7 +189,10 @@ def _install_fakes() -> None:
                 pass
 
             def setEnabled(self, v: bool) -> None:
-                pass
+                self._enabled = v
+
+            def isEnabled(self) -> bool:
+                return getattr(self, "_enabled", True)
 
             def setObjectName(self, name: str) -> None:
                 self._object_name = name
@@ -191,6 +211,12 @@ def _install_fakes() -> None:
 
             def setText(self, s: str) -> None:
                 self._text = s
+
+            def setPlaceholderText(self, text: str) -> None:
+                pass
+
+            def setCurrentText(self, text: str) -> None:
+                self._text = text
 
             def text(self) -> str:
                 return getattr(self, "_text", "")
@@ -235,7 +261,21 @@ def _install_fakes() -> None:
             def show(self) -> None:
                 pass
 
+        class _FakeQStatusBar:
+            def __init__(self) -> None:
+                self._message = ""
+
+            def showMessage(self, msg: str, timeout: int = 0) -> None:
+                self._message = msg
+
+            def currentMessage(self) -> str:
+                return self._message
+
         class _FakeQMainWindow(_FakeQWidget):
+            def __init__(self, parent: object = None) -> None:
+                super().__init__(parent)
+                self._status_bar = _FakeQStatusBar()
+
             def resize(self, w: int, h: int) -> None:
                 pass
 
@@ -245,8 +285,8 @@ def _install_fakes() -> None:
             def setWindowTitle(self, t: str) -> None:
                 pass
 
-            def statusBar(self) -> object:
-                return MagicMock()
+            def statusBar(self) -> _FakeQStatusBar:
+                return self._status_bar
 
         class _FakeQPushButton(_FakeQWidget):
             def click(self) -> None:
@@ -269,10 +309,12 @@ def _install_fakes() -> None:
 
         class _FakeQComboBox(_FakeQWidget):
             def addItems(self, items: list[str]) -> None:
-                pass
+                self._items = list(items)
+                if items:
+                    self._text = items[0]
 
             def currentText(self) -> str:
-                return "English"
+                return getattr(self, "_text", "")
 
         class _FakeQScrollArea(_FakeQWidget):
             def setWidgetResizable(self, resizable: bool) -> None:
