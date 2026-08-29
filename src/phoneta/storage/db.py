@@ -75,6 +75,8 @@ class PracticeStore:
 
     def __init__(self, db_path: str | Path = "phoneta_history.db") -> None:
         self.db_path = Path(db_path)
+        if str(self.db_path) != ":memory:":
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._ensure_schema()
 
     # ------------------------------------------------------------------

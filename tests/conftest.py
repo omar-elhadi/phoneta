@@ -316,6 +316,32 @@ def _install_fakes() -> None:
             def currentText(self) -> str:
                 return getattr(self, "_text", "")
 
+        class _FakeQListWidgetItem:
+            def __init__(self, text: str) -> None:
+                self._text = text
+
+            def text(self) -> str:
+                return self._text
+
+        class _FakeQListWidget(_FakeQWidget):
+            def __init__(self, parent: object = None) -> None:
+                super().__init__(parent)
+                self._items: list[_FakeQListWidgetItem] = []
+
+            def addItem(self, item: object) -> None:
+                if isinstance(item, str):
+                    item = _FakeQListWidgetItem(item)
+                self._items.append(item)
+
+            def clear(self) -> None:
+                self._items.clear()
+
+            def count(self) -> int:
+                return len(self._items)
+
+            def item(self, index: int) -> _FakeQListWidgetItem:
+                return self._items[index]
+
         class _FakeQScrollArea(_FakeQWidget):
             def setWidgetResizable(self, resizable: bool) -> None:
                 pass
@@ -338,6 +364,8 @@ def _install_fakes() -> None:
             QHeaderView=MagicMock(),
             QLabel=_FakeQLabel,
             QLineEdit=_FakeQWidget,
+            QListWidget=_FakeQListWidget,
+            QListWidgetItem=_FakeQListWidgetItem,
             QMainWindow=_FakeQMainWindow,
             QMessageBox=MagicMock(),
             QProgressBar=_FakeQProgressBar,

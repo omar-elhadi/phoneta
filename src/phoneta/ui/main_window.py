@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
 from phoneta.core.metrics.prosody import ProsodyResult
 from phoneta.core.metrics.scoring import WordScore
 from phoneta.core.pipeline import PipelineResult, run_pipeline
+from phoneta.storage.db import PracticeStore
+from phoneta.ui.history_view import HistoryView
 from phoneta.ui.inspector import InspectorDialog
 from phoneta.ui.privacy_badge import PrivacyBadge
 from phoneta.ui.recorder_view import RecorderView
@@ -98,6 +100,7 @@ class MainWindow(QMainWindow):
         self._last_audio: np.ndarray | None = None
         self._pipeline_worker: _PipelineWorker | None = None
         self._settings = QSettings("Phoneta", "Phoneta")
+        self._store = PracticeStore(self._history_path())
         self._build()
         self._restore_settings()
 
@@ -165,10 +168,22 @@ class MainWindow(QMainWindow):
         self.results.word_clicked.connect(self._on_word_clicked)
         root.addWidget(self.results)
 
+        # ── history ───────────────────────────────────────────────
+        self.history = HistoryView(self._store)
+        self.history.refresh()
+        root.addWidget(self.history)
+
         # ── status bar ────────────────────────────────────────────
         self.statusBar().showMessage("Ready — 100% offline, nothing leaves this machine")
 
     # ── settings persistence ─────────────────────────────────────────
+
+    @staticmethod
+    def _history_path() -> str:
+        """Use the platform data directory for history when available."""
+        from pathlib import Path
+
+        return str(Path.home() / ".phoneta" / "history.db")
 
     def _restore_settings(self) -> None:
         text = self._settings.value("target_text", "")
@@ -229,6 +244,13 @@ class MainWindow(QMainWindow):
         self._last_words = result.words
         self._last_prosody = result.prosody
         self.results.set_results(result.words)
+        self._store.save_session(
+            target_text=self.txt_target.text().strip(),
+            lang=LANGS[self.cmb_lang.currentText()],
+            words=result.words,
+            alignment_method=result.alignment_method,
+        )
+        self.history.refresh()
         self._save_settings()
         self.statusBar().showMessage(
             f"Done — {len(result.words)} words scored · "
