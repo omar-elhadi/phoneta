@@ -134,9 +134,22 @@ def _install_fakes() -> None:
             def setValue(self, key: str, value: object) -> None:
                 self._store[key] = value
 
+        class _FakeQTimer:
+            timeout = _FakeSignal()
+
+            def __init__(self, parent: object = None) -> None:
+                pass
+
+            def setSingleShot(self, value: bool) -> None:
+                pass
+
+            def start(self, milliseconds: int) -> None:
+                pass
+
         _conv = _module(
             "PySide6.QtCore",
             Signal=_FakeSignal,
+            QTimer=_FakeQTimer,
             QThread=_FakeQThread,
             Qt=MagicMock(),
             QObject=MagicMock(),
@@ -173,6 +186,18 @@ def _install_fakes() -> None:
                 pass
 
             def update(self) -> None:
+                pass
+
+            def show(self) -> None:
+                self._visible = True
+
+            def hide(self) -> None:
+                self._visible = False
+
+            def raise_(self) -> None:
+                pass
+
+            def adjustSize(self) -> None:
                 pass
 
             def findChild(self, *args: object, **kwargs: object) -> object:

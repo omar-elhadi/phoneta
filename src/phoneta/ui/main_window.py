@@ -29,6 +29,7 @@ from phoneta.ui.inspector import InspectorDialog
 from phoneta.ui.privacy_badge import PrivacyBadge
 from phoneta.ui.recorder_view import RecorderView
 from phoneta.ui.result_view import ResultView
+from phoneta.ui.toast import Toast, analysis_message, recording_message
 
 LANGS = {"English": "en", "French (français)": "fr"}
 
@@ -101,7 +102,9 @@ class MainWindow(QMainWindow):
         self._pipeline_worker: _PipelineWorker | None = None
         self._settings = QSettings("Phoneta", "Phoneta")
         self._store = PracticeStore(self._history_path())
+        self._toast: Toast | None = None
         self._build()
+        self._toast = Toast(self)
         self._restore_settings()
 
     # ── UI construction ─────────────────────────────────────────────
@@ -206,6 +209,7 @@ class MainWindow(QMainWindow):
         if not isinstance(result, RecordResult):
             return
         self._last_audio = result.samples
+        self._notify(recording_message(False))
         self.btn_analyse.setEnabled(True)
         self._reanalyse()
 
@@ -222,7 +226,8 @@ class MainWindow(QMainWindow):
             return
 
         lang = LANGS[self.cmb_lang.currentText()]
-        self.statusBar().showMessage("Analysing pronunciation …")
+        self._notify(analysis_message(False))
+        self._notify(analysis_message(False))
         self.btn_analyse.setEnabled(False)
 
         self._pipeline_worker = _PipelineWorker(
@@ -233,17 +238,24 @@ class MainWindow(QMainWindow):
         self._pipeline_worker.done.connect(self._on_pipeline_done)
         self._pipeline_worker.start()
 
+    def _notify(self, message: str) -> None:
+        """Display a transient toast and mirror it in the status bar."""
+        self.statusBar().showMessage(message)
+        if self._toast is not None:
+            self._toast.show_message(message)
+
     def _on_pipeline_done(self, result: object) -> None:
         self.btn_analyse.setEnabled(self._last_audio is not None)
         if isinstance(result, Exception):
             QMessageBox.warning(self, "Analysis failed", error_hint(result))
-            self.statusBar().showMessage("Analysis failed — see the message for help.")
+            self._notify("Analysis failed — see the message for help.")
             return
 
         assert isinstance(result, PipelineResult)
         self._last_words = result.words
         self._last_prosody = result.prosody
         self.results.set_results(result.words)
+        self._notify(analysis_message(True, len(result.words)))
         self._store.save_session(
             target_text=self.txt_target.text().strip(),
             lang=LANGS[self.cmb_lang.currentText()],
